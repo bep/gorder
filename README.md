@@ -1,3 +1,4 @@
 # gorder
 
-This is a very opiniated Go source code reorganizer.
+This is a very opinionated Go source code reorganizer.
+
