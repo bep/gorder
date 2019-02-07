@@ -98,8 +98,6 @@ func handleFile(filename string, write bool) error {
 		out = os.Stdout
 	}
 
-	//	out = ioutil.Discard
-
 	if err := decorator.Fprint(out, file); err != nil {
 		log.Fatal(err)
 	}
@@ -135,40 +133,53 @@ func sortDecls(decls []dst.Decl) {
 			return i < j
 		}
 
-		if isFuncDecl(di) && !isFuncDecl(dj) {
-			return false
+		funcName := func(d dst.Decl) (string, int) {
+			f, ok := d.(*dst.FuncDecl)
+			if !ok {
+				return "", -1
+			}
+			fr := fieldListName(f.Recv)
+
+			return fmt.Sprintf("%s.%s", fr, f.Name), 0
+
 		}
 
-		if isFuncDecl(di) != isFuncDecl(dj) {
-			return true
-		}
-
-		if isFuncDecl(di) {
-			f1, f2 := di.(*dst.FuncDecl), dj.(*dst.FuncDecl)
-
-			if f1.Recv == nil && f2.Recv != nil {
-				// Sort functions before methods
-				return true
+		genName := func(d dst.Decl) (string, int) {
+			m, ok := d.(*dst.GenDecl)
+			if !ok {
+				return "", -1
 			}
 
-			f1r, f2r := fieldListName(f1.Recv), fieldListName(f2.Recv)
-
-			if f1r != f2r {
-				return f1r < f2r
+			if m.Tok == token.TYPE {
+				return m.Specs[0].(*dst.TypeSpec).Name.String(), 0
 			}
 
-			return lessStringers(f1.Name, f2.Name)
+			return "", 1
+
 		}
 
-		m1, m2 := di.(*dst.GenDecl), dj.(*dst.GenDecl)
-
-		if m1.Tok == m2.Tok {
-			if m1.Tok == token.TYPE {
-				return lessStringers(m1.Specs[0].(*dst.TypeSpec).Name, m2.Specs[0].(*dst.TypeSpec).Name)
+		name := func(d dst.Decl) (string, int) {
+			s, status := funcName(d)
+			if status != -1 {
+				return s, status
 			}
+
+			return genName(d)
+
 		}
 
-		return i < j
+		si, statusi := name(di)
+		sj, statusj := name(dj)
+
+		if statusi == 1 || statusj == 1 {
+			return i < j
+		}
+
+		if statusi != statusj {
+			return statusi == 0
+		}
+
+		return lesss(si, sj)
 	})
 }
 
@@ -212,7 +223,8 @@ func lessStringers(s1, s2 fmt.Stringer) bool {
 }
 
 func lesss(s1, s2 string) bool {
-	e1, e2 := isExported(s1), isExported(s2)
+	e1, e2 := isImportant(s1), isImportant(s2)
+
 	if e1 != e2 {
 		if e1 {
 			return true
@@ -243,11 +255,15 @@ func isFuncDecl(decl dst.Decl) bool {
 	}
 }
 
-func isExported(name string) bool {
-	if strings.Contains(name, ".") {
+func isImportant(name string) bool {
+	doti := strings.Index(name, ".")
+	if doti <= 0 {
 		return true
 	}
+
+	name = name[doti+1:]
 	for _, r := range name {
+		// Is exported?
 		return unicode.IsUpper(r)
 	}
 	return false
