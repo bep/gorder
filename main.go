@@ -21,6 +21,10 @@ var (
 	write = flag.Bool("w", false, "write result to (source) file instead of stdout")
 )
 
+const (
+	magicTypeMarker = "______"
+)
+
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix("error: ")
@@ -89,7 +93,6 @@ func handleFile(filename string, write bool) error {
 			sortFieldList(v.Methods)
 		case *dst.StructType:
 		case *dst.FieldList:
-
 		case nil:
 		default:
 
@@ -135,13 +138,24 @@ func sortFieldList(fields *dst.FieldList) {
 			return false
 		}
 
-		return lessStringers(fi.Names[0], fj.Names[0])
+		ll := lessStringers(fi.Names[0], fj.Names[0])
+
+		return ll
 	})
 }
 
 func sortDecls(decls []dst.Decl) {
 	sort.SliceStable(decls, func(i, j int) bool {
 		di, dj := decls[i], decls[j]
+
+		const (
+			// Less means higher up. We do some adjustments between these,
+			// so keep some empty space.
+			funcWeight            = 200
+			typeWeight            = 100
+			constructorFuncWeight = 50 // newSomething
+			exportedFuncWeight    = 30
+		)
 
 		if preserveOrder(di) || preserveOrder(dj) {
 			return i < j
@@ -152,9 +166,29 @@ func sortDecls(decls []dst.Decl) {
 			if !ok {
 				return "", -1
 			}
+
 			fr := fieldListName(f.Recv)
 
-			return fmt.Sprintf("%s.%s", fr, f.Name), 0
+			name := f.Name.String()
+
+			if fr == "" {
+				if strings.HasPrefix(name, "new") {
+					return name, constructorFuncWeight
+				}
+
+				if firstUpper(name) {
+					weight := exportedFuncWeight
+					if strings.HasPrefix(name, "New") {
+						weight--
+					}
+					return name, weight
+				}
+
+				return name, funcWeight
+			}
+
+			// This is a method. We want that below the receiver type definition, if possible.
+			return fmt.Sprintf("%s.%s", fr, name), typeWeight
 
 		}
 
@@ -165,32 +199,34 @@ func sortDecls(decls []dst.Decl) {
 			}
 
 			if m.Tok == token.TYPE {
-				return m.Specs[0].(*dst.TypeSpec).Name.String(), 0
+				// Return on the form receiver.____ to make sure it's grouped with the
+				// methods it owns.
+				return m.Specs[0].(*dst.TypeSpec).Name.String() + "." + magicTypeMarker, typeWeight
 			}
 
-			return "", 1
+			return "", -1
 
 		}
 
 		name := func(d dst.Decl) (string, int) {
-			s, status := funcName(d)
-			if status != -1 {
-				return s, status
+			s, weight := funcName(d)
+			if weight != -1 {
+				return s, weight
 			}
 
 			return genName(d)
 
 		}
 
-		si, statusi := name(di)
-		sj, statusj := name(dj)
+		si, weighti := name(di)
+		sj, weightj := name(dj)
 
-		if statusi == 1 || statusj == 1 {
+		if weighti == -1 && weightj == -1 {
 			return i < j
 		}
 
-		if statusi != statusj {
-			return statusi == 0
+		if weighti != weightj {
+			return weighti < weightj
 		}
 
 		return lesss(si, sj)
@@ -236,17 +272,45 @@ func lessStringers(s1, s2 fmt.Stringer) bool {
 	return lesss(s1.String(), s2.String())
 }
 
-func lesss(s1, s2 string) bool {
-	e1, e2 := isImportant(s1), isImportant(s2)
+func weightAdjustment(name string) int {
+	w := 0
 
-	if e1 != e2 {
-		if e1 {
-			return true
-		} else {
-			return false
-		}
+	if name == magicTypeMarker {
+		w -= 5
+	}
+	// Exported funcs
+	if firstUpper(name) {
+		w -= 2
 	}
 
+	// Exported constructor funcs.
+	if strings.HasPrefix(name, "New") {
+		w--
+	}
+
+	return w
+}
+
+func lesss(s1, s2 string) bool {
+	s1r, s1name := splitOnDot(s1)
+	s2r, s2name := splitOnDot(s2)
+
+	if s1r != s2r {
+		// Different receiver types
+		return s1r < s2r
+	}
+
+	s1w := 100
+	s2w := 100
+
+	s1w += weightAdjustment(s1name)
+	s2w += weightAdjustment(s2name)
+
+	if s1w != s2w {
+		return s1w < s2w
+	}
+
+	// Order alphabetically
 	return s1 < s2
 
 }
@@ -269,15 +333,21 @@ func isFuncDecl(decl dst.Decl) bool {
 	}
 }
 
-func isImportant(name string) bool {
-	doti := strings.Index(name, ".")
-	if doti <= 0 {
-		return true
+func splitOnDot(name string) (string, string) {
+	parts := strings.Split(name, ".")
+	if len(parts) > 2 {
+		panic("too many")
+	}
+	if len(parts) == 1 {
+		return "", name
 	}
 
-	name = name[doti+1:]
+	return parts[0], parts[1]
+
+}
+
+func firstUpper(name string) bool {
 	for _, r := range name {
-		// Is exported?
 		return unicode.IsUpper(r)
 	}
 	return false
