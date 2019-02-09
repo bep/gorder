@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"unicode"
@@ -21,6 +22,8 @@ var (
 )
 
 func main() {
+	log.SetFlags(0)
+	log.SetPrefix("error: ")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -28,10 +31,21 @@ func main() {
 		log.Fatal("missing filename")
 	}
 
-	filename := flag.Arg(0)
-
-	if err := handleFile(filename, *write); err != nil {
+	filenames, err := filepath.Glob(flag.Arg(0))
+	if err != nil {
 		log.Fatal(err)
+	}
+
+	w := *write
+
+	if len(filenames) > 1 && !w {
+		log.Fatal("multiple file matches require the -w flag")
+	}
+
+	for _, filename := range filenames {
+		if err := handleFile(filename, w); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
