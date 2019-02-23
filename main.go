@@ -310,8 +310,32 @@ func lesss(s1, s2 string) bool {
 		return s1w < s2w
 	}
 
-	// Order alphabetically
-	return s1 < s2
+	var s1prefix, s2prefix string
+
+	s1name, s1prefix = trimCommonPrefix(s1name)
+	s2name, s2prefix = trimCommonPrefix(s2name)
+
+	if s1prefix != "" && s2prefix != "" {
+		return s1prefix < s2prefix
+	}
+
+	return s1name < s2name
+
+}
+
+var commonPrefixes = []string{"Is", "Has", "Get", "All", "Create", "New", "Err", "Error", "Init", "Find", "Set", "Render"}
+
+func trimCommonPrefix(s string) (string, string) {
+	for _, prefix := range commonPrefixes {
+		if strings.HasPrefix(s, prefix) {
+			return prefix, strings.TrimPrefix(s, prefix)
+		}
+		if strings.HasPrefix(s, strings.ToLower(prefix)) {
+			return prefix, strings.TrimPrefix(s, strings.ToLower(prefix))
+		}
+	}
+
+	return "", s
 
 }
 
