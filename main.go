@@ -155,6 +155,7 @@ func sortDecls(decls []dst.Decl) {
 			typeWeight            = 100
 			constructorFuncWeight = 50 // newSomething
 			exportedFuncWeight    = 30
+			mainFuncWeight        = 10
 		)
 
 		if preserveOrder(di) || preserveOrder(dj) {
@@ -172,6 +173,10 @@ func sortDecls(decls []dst.Decl) {
 			name := f.Name.String()
 
 			if fr == "" {
+				if name == "main" {
+					return name, mainFuncWeight
+				}
+
 				if strings.HasPrefix(name, "new") {
 					return name, constructorFuncWeight
 				}
