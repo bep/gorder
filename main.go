@@ -35,7 +35,8 @@ func main() {
 		log.Fatal("missing filename")
 	}
 
-	filenames, err := filepath.Glob(flag.Arg(0))
+	pattern := flag.Arg(0)
+	filenames, err := filepath.Glob(pattern)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,6 +45,11 @@ func main() {
 
 	if len(filenames) > 1 && !w {
 		log.Fatal("multiple file matches require the -w flag")
+	}
+
+	if len(filenames) == 0 {
+		fmt.Fprintf(os.Stderr, "Pattern %q matched zero files\n", pattern)
+		return
 	}
 
 	for _, filename := range filenames {
