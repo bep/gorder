@@ -17,9 +17,7 @@ import (
 	"github.com/dave/dst/decorator"
 )
 
-var (
-	write = flag.Bool("w", false, "write result to (source) file instead of stdout")
-)
+var write = flag.Bool("w", false, "write result to (source) file instead of stdout")
 
 const (
 	magicTypeMarker = "______"
@@ -65,7 +63,7 @@ func usage() {
 }
 
 func handleFile(filename string, write bool) error {
-	var perm os.FileMode = 0644
+	var perm os.FileMode = 0o644
 
 	f, err := os.Open(filename)
 	if err != nil {
@@ -105,7 +103,6 @@ func handleFile(filename string, write bool) error {
 		}
 
 		return true
-
 	})
 
 	var out io.Writer
@@ -200,7 +197,6 @@ func sortDecls(decls []dst.Decl) {
 
 			// This is a method. We want that below the receiver type definition, if possible.
 			return fmt.Sprintf("%s.%s", fr, name), typeWeight
-
 		}
 
 		genName := func(d dst.Decl) (string, int) {
@@ -216,7 +212,6 @@ func sortDecls(decls []dst.Decl) {
 			}
 
 			return "", -1
-
 		}
 
 		name := func(d dst.Decl) (string, int) {
@@ -226,7 +221,6 @@ func sortDecls(decls []dst.Decl) {
 			}
 
 			return genName(d)
-
 		}
 
 		si, weighti := name(di)
@@ -276,7 +270,6 @@ func less(s, t interface{}) bool {
 	}
 
 	return lesss(strf(s), strf(t))
-
 }
 
 func lessStringers(s1, s2 fmt.Stringer) bool {
@@ -331,7 +324,6 @@ func lesss(s1, s2 string) bool {
 	}
 
 	return s1name < s2name
-
 }
 
 var commonPrefixes = []string{"Is", "Has", "Get", "All", "Create", "New", "Err", "Error", "Init", "Find", "Set", "Render"}
@@ -347,7 +339,6 @@ func trimCommonPrefix(s string) (string, string) {
 	}
 
 	return "", s
-
 }
 
 func preserveOrder(decl dst.Decl) bool {
@@ -378,7 +369,6 @@ func splitOnDot(name string) (string, string) {
 	}
 
 	return parts[0], parts[1]
-
 }
 
 func firstUpper(name string) bool {
