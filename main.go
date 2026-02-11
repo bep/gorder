@@ -257,8 +257,8 @@ func fieldListName(list *dst.FieldList) string {
 	return b.String()
 }
 
-func less(s, t interface{}) bool {
-	strf := func(in interface{}) string {
+func less(s, t any) bool {
+	strf := func(in any) string {
 		switch v := in.(type) {
 		case *dst.SelectorExpr:
 			return fmt.Sprintf("%s.%s", v.X, v.Sel)
